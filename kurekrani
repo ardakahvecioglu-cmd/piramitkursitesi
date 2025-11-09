@@ -3,30 +3,70 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=640, initial-scale=1, user-scalable=no" />
-<title>Canlı Kurlar – 640×1152</title>
+<title>Canlı Kurlar</title>
 <style>
 body{
-  margin:0;background:#0f1115;color:#fff;font-family:Segoe UI,Roboto,Arial,sans-serif;
-  width:640px;height:1152px;overflow:hidden;position:relative;
+  margin:0;
+  background:#0f1115;
+  color:#fff;
+  font-family:Segoe UI,Roboto,Arial,sans-serif;
+  width:640px;
+  height:1152px;
+  overflow:hidden;
+  position:relative;
+}
+header{
+  text-align:center;
+  padding:25px 10px 5px;
+  font-size:28px;
+  font-weight:600;
+  color:#3aa0ff;
+}
+#time{
+  text-align:center;
+  font-size:13px;
+  color:#999;
+  margin-bottom:10px;
 }
 footer{
-  position:absolute;bottom:0;left:0;width:100%;
-  display:flex;justify-content:space-between;align-items:center;
-  padding:10px 15px;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 15px;
+  background:rgba(0,0,0,0.8);
+  backdrop-filter:blur(8px);
   border-top:1px solid #222;
 }
 .card{
-  flex:1;text-align:center;margin:0 5px;background:#1a1f29;
-  border-radius:12px;padding:8px 6px;font-size:18px;
+  flex:1;
+  text-align:center;
+  margin:0 5px;
+  background:#1a1f29;
+  border-radius:12px;
+  padding:8px 6px;
+  font-size:18px;
+  transition:all .3s ease;
 }
-.label{font-size:12px;color:#aaa;margin-bottom:4px;}
-.value{font-weight:bold;font-size:22px;transition:color .3s;}
+.label{
+  font-size:12px;
+  color:#aaa;
+  margin-bottom:4px;
+}
+.value{
+  font-weight:bold;
+  font-size:22px;
+  transition:color .3s;
+}
 .up{color:#18c964;}
 .down{color:#ff4d4f;}
-#time{position:absolute;bottom:65px;width:100%;text-align:center;color:#888;font-size:12px;}
 </style>
 </head>
 <body>
+  <header>💱 Canlı Kurlar</header>
   <div id="time">Yükleniyor...</div>
   <footer>
     <div class="card"><div class="label">USD / TRY</div><div id="usd" class="value">--</div></div>
@@ -38,11 +78,15 @@ footer{
 <script>
 const el = (id)=>document.getElementById(id);
 const last={};
+
+// API'den kur çekme
 async function getRate(from,to){
-  const r=await fetch(`https://api.exchangerate.host/convert?from=${from}&to=${to}&t=${Date.now()}`);
-  const j=await r.json();
-  return j.result;
+  const res = await fetch(`https://api.exchangerate.host/convert?from=${from}&to=${to}&t=${Date.now()}`);
+  const data = await res.json();
+  return data.result;
 }
+
+// Değer güncelle
 function update(id,val){
   const v=parseFloat(val);
   const prev=last[id];
@@ -55,6 +99,8 @@ function update(id,val){
     else e.className="value";
   }
 }
+
+// Ana yenileme fonksiyonu
 async function refresh(){
   try{
     const [usd,eur,gbp,xau]=await Promise.all([
@@ -66,12 +112,14 @@ async function refresh(){
     update("usd",usd);
     update("eur",eur);
     update("gbp",gbp);
-    update("gold",xau/31.1035);
+    update("gold",xau/31.1035); // gram altın = ons/31.1035
     el("time").textContent="Son güncelleme: "+new Date().toLocaleTimeString("tr-TR",{hour12:false});
   }catch(e){
+    el("time").textContent="Veri alınamadı";
     console.error(e);
   }
 }
+
 refresh();
 setInterval(refresh,10000);
 </script>
