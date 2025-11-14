@@ -1,1 +1,140 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=640, initial-scale=1, user-scalable=no" />
+  <title>Canlı Kurlar</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0f1115;
+      color: #fff;
+      font-family: Segoe UI, Roboto, Arial, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    header {
+      position: absolute;
+      left: 15px;
+      right: 15px;
+      bottom: 95px;
+      padding: 0 0 5px;
+      font-size: 18px;
+      font-weight: 400;
+      color: #bbb;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border-top: 1px solid #222;
+      box-sizing: border-box;
+    }
+
+    .card {
+      flex: 1;
+      text-align: center;
+      margin: 0 5px;
+      background: #1a1f29;
+      border-radius: 12px;
+      padding: 8px 6px;
+      font-size: 18px;
+      box-sizing: border-box;
+    }
+
+    .label { font-size: 12px; color: #aaa; }
+    .value { font-size: 22px; font-weight: bold; transition: color 0.3s; }
+    .up { color: #18c964; }
+    .down { color: #ff4d4f; }
+  </style>
+</head>
+
+<body>
+
+  <header><span id="time">Yükleniyor...</span></header>
+
+  <footer>
+    <div class="card"><div class="label">USD / TRY</div><div id="usd" class="value">--</div></div>
+    <div class="card"><div class="label">EUR / TRY</div><div id="eur" class="value">--</div></div>
+    <div class="card"><div class="label">GBP / TRY</div><div id="gbp" class="value">--</div></div>
+    <div class="card"><div class="label">GRAM ALTIN</div><div id="gold" class="value">--</div></div>
+  </footer>
+
+<script>
+function el(id){ return document.getElementById(id); }
+
+var cache = { usd:null, eur:null, gbp:null, gold:null };
+var last = {};
+var lastUpdate = null;
+
+function applyChange(id,val){
+  var e = el(id);
+  var v = Number(val);
+  if(!v){ e.textContent="--"; return; }
+  var prev = last[id];
+  last[id] = v;
+  cache[id] = v;
+  e.textContent = v.toFixed(2);
+  if(prev){
+    if(v > prev) e.className="value up";
+    else if(v < prev) e.className="value down";
+    else e.className="value";
+  } else e.className="value";
+}
+
+function fetchJSON(url,cb){
+  fetch(url).then(r=>r.json()).then(cb).catch(()=>{});
+}
+
+function fetchRates(){
+  fetchJSON(
+    "https://api.exchangerate.host/latest?base=USD&symbols=TRY,EUR,GBP",
+    function(data){
+      var r = data.rates;
+      var usd = r.TRY;
+      var eur = usd/r.EUR;
+      var gbp = usd/r.GBP;
+      applyChange("usd",usd);
+      applyChange("eur",eur);
+      applyChange("gbp",gbp);
+      lastUpdate = new Date();
+      fetchGold();
+    }
+  );
+}
+
+function fetchGold(){
+  fetchJSON(
+    "https://data-asg.goldprice.org/dbXRates/USD",
+    function(data){
+      var ons = data?.items?.[0]?.xauPrice;
+      if(ons && cache.usd){
+        var gram = (ons * cache.usd) / 31.1035;
+        applyChange("gold", gram);
+      }
+    }
+  );
+}
+
+window.addEventListener("load",fetchRates);
+
+setInterval(fetchRates,3600000);
+setInterval(()=>{},15000);
+</script>
+
+</body>
+</html>
 
