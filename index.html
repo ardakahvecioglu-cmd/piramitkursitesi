@@ -1,34 +1,3 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=640, initial-scale=1, user-scalable=no" />
-<title>Canlı Kurlar</title>
-
-<style>
-  body{margin:0;background:#0f1115;color:#fff;font-family:Segoe UI,Roboto,Arial,sans-serif;overflow:hidden;}
-  header{position:absolute;left:15px;bottom:95px;color:#bbb;font-size:18px;}
-  footer{position:absolute;bottom:0;left:0;width:100%;display:flex;justify-content:space-between;padding:10px 15px;background:rgba(0,0,0,.8);}
-  .card{flex:1;margin:0 5px;background:#1a1f29;border-radius:12px;text-align:center;padding:8px 6px;}
-  .label{font-size:12px;color:#aaa;}
-  .value{font-size:22px;font-weight:bold;}
-  .up{color:#18c964;}
-  .down{color:#ff4d4f;}
-</style>
-
-</head>
-
-<body>
-
-<header><span id="time">Yükleniyor...</span></header>
-
-<footer>
-  <div class="card"><div class="label">USD / TRY</div><div id="usd" class="value">--</div></div>
-  <div class="card"><div class="label">EUR / TRY</div><div id="eur" class="value">--</div></div>
-  <div class="card"><div class="label">GBP / TRY</div><div id="gbp" class="value">--</div></div>
-  <div class="card"><div class="label">GRAM ALTIN</div><div id="gold" class="value">--</div></div>
-</footer>
-
 <script>
 function el(id){ return document.getElementById(id); }
 
@@ -36,57 +5,83 @@ let cache = { usd:null };
 let last = {};
 
 function applyChange(id,val){
-  let e = el(id);
-  let v = Number(val);
-  if(!v){ e.textContent="--"; return; }
-  let prev = last[id];
+  const e = el(id);
+  const v = Number(val);
+  if(!e) return;
+  if(!isFinite(v)){ e.textContent="--"; e.className="value"; return; }
+
+  const prev = last[id];
   last[id] = v;
   e.textContent = v.toFixed(2);
-  if(prev){
-    if(v > prev) e.className="value up";
-    else if(v < prev) e.className="value down";
-    else e.className="value";
-  }
+
+  if(prev === undefined){ e.className = "value"; return; }
+  if(v > prev) e.className = "value up";
+  else if(v < prev) e.className = "value down";
+  else e.className = "value";
 }
 
 function fetchJSON(url){
-  return fetch(url).then(r=>r.json());
+  return fetch(url).then(r => r.json());
 }
 
+// USD bazlı, açık ve stabil bir API kullanıyoruz
+// https://open.er-api.com/v6/latest/USD
 async function fetchRates(){
   try{
-    let fx = await fetchJSON("https://api.exchangerate.host/latest?base=USD&symbols=TRY,EUR,GBP");
+    const fx = await fetchJSON("https://open.er-api.com/v6/latest/USD");
 
-    let usd = fx.rates.TRY;
-    let eur = usd / fx.rates.EUR;
-    let gbp = usd / fx.rates.GBP;
+    if(!fx || fx.result === "error" || !fx.rates){
+      console.error("Kur verisi hatalı:", fx);
+      return;
+    }
 
-    cache.usd = usd;
+    const r = fx.rates;
 
-    applyChange("usd", usd);
-    applyChange("eur", eur);
-    applyChange("gbp", gbp);
+    // 1 USD = r.TRY TL
+    const usdtry = r.TRY;
+    if(!isFinite(usdtry)){
+      console.error("TRY kuru yok:", r);
+      return;
+    }
 
-    document.getElementById("time").textContent = "Son güncelleme: " + new Date().toLocaleTimeString("tr-TR");
+    // 1 USD = r.EUR EUR  => 1 EUR = usdtry / r.EUR TL
+    const eurtry = usdtry / r.EUR;
+    const gbptry = usdtry / r.GBP;
 
-    fetchGold();
+    cache.usd = usdtry;
+
+    applyChange("usd", usdtry);
+    applyChange("eur", eurtry);
+    applyChange("gbp", gbptry);
+
+    el("time").textContent =
+      "Son güncelleme: " + new Date().toLocaleTimeString("tr-TR");
+
+    fetchGold(); // kurlar geldikten sonra altını hesapla
+  }catch(e){
+    console.error("Döviz hatası:", e);
   }
-  catch(e){ console.log(e); }
 }
 
 async function fetchGold(){
   try{
-    let data = await fetchJSON("https://data-asg.goldprice.org/dbXRates/USD");
-    let ons = data.items[0].xauPrice;
-    let gram = (ons * cache.usd) / 31.1035;
+    if(!cache.usd) return;
+
+    const data = await fetchJSON("https://data-asg.goldprice.org/dbXRates/USD");
+    const ons = data?.items?.[0]?.xauPrice;
+
+    if(!isFinite(ons)){
+      console.error("Ons verisi hatalı:", data);
+      return;
+    }
+
+    const gram = (ons * cache.usd) / 31.1035;
     applyChange("gold", gram);
+  }catch(e){
+    console.error("Altın hatası:", e);
   }
-  catch(e){ console.log(e); }
 }
 
-window.onload = fetchRates;
-setInterval(fetchRates, 60000);
+window.addEventListener("load", fetchRates);
+setInterval(fetchRates, 60_000);
 </script>
-
-</body>
-</html>
