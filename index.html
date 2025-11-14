@@ -1,3 +1,78 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=640, initial-scale=1, user-scalable=no" />
+  <title>Canlı Kurlar</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0f1115;
+      color: #fff;
+      font-family: Segoe UI, Roboto, Arial, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    header {
+      position: absolute;
+      left: 15px;
+      right: 15px;
+      bottom: 95px;
+      padding: 0 0 5px;
+      font-size: 18px;
+      font-weight: 400;
+      color: #bbb;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    footer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border-top: 1px solid #222;
+      box-sizing: border-box;
+    }
+
+    .card {
+      flex: 1;
+      text-align: center;
+      margin: 0 5px;
+      background: #1a1f29;
+      border-radius: 12px;
+      padding: 8px 6px;
+      font-size: 18px;
+      box-sizing: border-box;
+    }
+
+    .label { font-size: 12px; color: #aaa; }
+    .value { font-size: 22px; font-weight: bold; transition: color 0.3s; }
+    .up { color: #18c964; }
+    .down { color: #ff4d4f; }
+  </style>
+</head>
+
+<body>
+
+  <header><span id="time">Yükleniyor...</span></header>
+
+  <footer>
+    <div class="card"><div class="label">USD / TRY</div><div id="usd" class="value">--</div></div>
+    <div class="card"><div class="label">EUR / TRY</div><div id="eur" class="value">--</div></div>
+    <div class="card"><div class="label">GBP / TRY</div><div id="gbp" class="value">--</div></div>
+    <div class="card"><div class="label">GRAM ALTIN</div><div id="gold" class="value">--</div></div>
+  </footer>
+
 <script>
 function el(id){ return document.getElementById(id); }
 
@@ -6,8 +81,9 @@ let last = {};
 
 function applyChange(id,val){
   const e = el(id);
+  if (!e) return;  // ← NULL HATASINI ÖNLER
+
   const v = Number(val);
-  if(!e) return;
   if(!isFinite(v)){ e.textContent="--"; e.className="value"; return; }
 
   const prev = last[id];
@@ -24,40 +100,27 @@ function fetchJSON(url){
   return fetch(url).then(r => r.json());
 }
 
-// USD bazlı, açık ve stabil bir API kullanıyoruz
-// https://open.er-api.com/v6/latest/USD
 async function fetchRates(){
   try{
     const fx = await fetchJSON("https://open.er-api.com/v6/latest/USD");
 
-    if(!fx || fx.result === "error" || !fx.rates){
-      console.error("Kur verisi hatalı:", fx);
-      return;
-    }
+    const r = fx?.rates;
+    if(!r) return console.error("Kur verisi yok");
 
-    const r = fx.rates;
+    const usd = r.TRY;
+    const eur = usd / r.EUR;
+    const gbp = usd / r.GBP;
 
-    // 1 USD = r.TRY TL
-    const usdtry = r.TRY;
-    if(!isFinite(usdtry)){
-      console.error("TRY kuru yok:", r);
-      return;
-    }
+    cache.usd = usd;
 
-    // 1 USD = r.EUR EUR  => 1 EUR = usdtry / r.EUR TL
-    const eurtry = usdtry / r.EUR;
-    const gbptry = usdtry / r.GBP;
-
-    cache.usd = usdtry;
-
-    applyChange("usd", usdtry);
-    applyChange("eur", eurtry);
-    applyChange("gbp", gbptry);
+    applyChange("usd", usd);
+    applyChange("eur", eur);
+    applyChange("gbp", gbp);
 
     el("time").textContent =
       "Son güncelleme: " + new Date().toLocaleTimeString("tr-TR");
 
-    fetchGold(); // kurlar geldikten sonra altını hesapla
+    fetchGold();
   }catch(e){
     console.error("Döviz hatası:", e);
   }
@@ -70,10 +133,7 @@ async function fetchGold(){
     const data = await fetchJSON("https://data-asg.goldprice.org/dbXRates/USD");
     const ons = data?.items?.[0]?.xauPrice;
 
-    if(!isFinite(ons)){
-      console.error("Ons verisi hatalı:", data);
-      return;
-    }
+    if(!isFinite(ons)) return;
 
     const gram = (ons * cache.usd) / 31.1035;
     applyChange("gold", gram);
@@ -85,3 +145,6 @@ async function fetchGold(){
 window.addEventListener("load", fetchRates);
 setInterval(fetchRates, 60_000);
 </script>
+
+</body>
+</html>
